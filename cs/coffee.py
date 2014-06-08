@@ -7,6 +7,6 @@ while True:
     t2 = os.path.getmtime('.')
     if t2 > t:
         print('Compiling')
-        subprocess.call(['coffee', '-cb', '.', '-d', '../js'])
+        subprocess.call(['coffee', '-cb', '-o', '../js', '.'])
         t = os.path.getmtime('.')
     time.sleep(1)
