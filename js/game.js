@@ -11,10 +11,10 @@ Block = (function(_super) {
   Block.pixel = PIXI.Texture.fromImage('img/pixel.bmp');
 
   function Block(x, y, width, height, tint) {
+    Block.__super__.constructor.call(this, Block.pixel);
     this.width = width;
     this.height = height;
     this.tint = tint;
-    Block.__super__.constructor.call(this, Block.pixel);
     this.position.set(x, y);
   }
 
@@ -26,8 +26,8 @@ ScrollContainer = (function(_super) {
   __extends(ScrollContainer, _super);
 
   function ScrollContainer(stage) {
-    this.stage = stage;
     ScrollContainer.__super__.constructor.call(this);
+    this.stage = stage;
     this.stage.addChild(this);
   }
 
@@ -42,8 +42,8 @@ ScrollContainer = (function(_super) {
     if (dy == null) {
       dy = 0;
     }
-    this.position.x += dx;
-    return this.position.y += dy;
+    this.position.x -= dx;
+    return this.position.y -= dy;
   };
 
   return ScrollContainer;
@@ -56,7 +56,7 @@ Game = (function() {
   function Game(el) {
     this.stage = new PIXI.Stage(0x222222);
     this.renderer = PIXI.autoDetectRenderer(Game.viewportSize, Game.viewportSize, el);
-    this.scroller = new PIXI.DisplayObjectContainer();
+    this.scroller = new ScrollContainer(this.stage);
     this.stage.addChild(this.scroller);
     this.level = new PIXI.DisplayObjectContainer();
     this.scroller.addChild(this.level);
@@ -71,12 +71,13 @@ Game = (function() {
   };
 
   Game.prototype.loadLevel = function(filename) {
-    var child, xhr, _i, _len, _ref;
+    var child, scope, xhr, _i, _len, _ref;
     _ref = this.level.children;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       child = _ref[_i];
       level.removeChild(child);
     }
+    scope = this;
     xhr = new XMLHttpRequest();
     xhr.open('GET', filename, true);
     xhr.addEventListener('load', function(event) {
@@ -87,7 +88,7 @@ Game = (function() {
       for (_j = 0, _len1 = blocks.length; _j < _len1; _j++) {
         el = blocks[_j];
         block = new Block(el[0], el[1], el[2], el[3], parseInt(el[4].substring(1), 16));
-        _results.push(level.addChild(block));
+        _results.push(scope.level.addChild(block));
       }
       return _results;
     });
