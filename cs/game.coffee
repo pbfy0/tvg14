@@ -2,8 +2,12 @@ $ = document.getElementById.bind(document)
 
 PIXI.DisplayObjectContainer::bounds = () ->
     r = new PIXI.Rectangle
-    r.x = @position.x - @anchor.x * @width
-    r.y = @position.y - @anchor.y * @height
+    if @anchor?
+        r.x = @position.x - @anchor.x * @width
+        r.y = @position.y - @anchor.y * @height
+    else
+        r.x = @position.x
+        r.y = @position.y
     r.width = @width
     r.height = @height
     return r
@@ -41,14 +45,28 @@ class Player extends PIXI.Sprite
     update: () ->
         [ox, oy] = [@position.x, @position.y]
         cell = @game.level.containingCell(@)
-        @vy += @g if not @onground
-        @position.x += @vx
+        f = cell[0]
+        @vy += @g
         @position.y += @vy
-        cell2 = @game.level.containingCell(@)
-        if not cell2? or (cell != cell2 and cell.tint != cell2.tint)
+        if @position.y > Game.viewportSize
             @position.y = oy
+            @onground = true if @vy > 0
             @vy = 0
-            @onground = true
+        return unless f?
+        celly = @game.level.containingCell(@)
+        for c in celly
+            if c not in cell
+                if c.tint != f.tint
+                    @position.y = oy
+                    @onground = true if @vy > 0
+                    @vy = 0
+        @position.x += @vx
+        cellx = @game.level.containingCell(@)
+        for c in cellx
+            if c not in cell
+                if c.tint != f.tint
+                    @position.x = ox
+        return
 
 
 class ScrollContainer extends PIXI.DisplayObjectContainer
@@ -71,9 +89,9 @@ class Level extends PIXI.DisplayObjectContainer
         _items = []
         for cell in @children
             b = cell.bounds()
-            _items.push(cell) if b.contains(x1, y1) and b.contains(x2, y1) and b.contains(x1, y2) and b.contains(x2, y2)
+            _items.push(cell) if b.contains(x1, y1) or b.contains(x2, y1) or b.contains(x1, y2) or b.contains(x2, y2)
 
-        _items
+        return _items
     
 
 class Game
@@ -102,8 +120,7 @@ class Game
             json = JSON.parse(xhr.responseText)
             blocks = json.blocks
             for el in blocks
-                e2 = (64*x for x in el[0..3])
-                block = new Block(e2[0], Game.viewportSize - e2[1], e2[2], e2[3], parseInt(el[4].substring(1), 16))
+                block = new Block(el[0]*64, Game.viewportSize - el[1]*64, el[2]*64, el[3]*64, parseInt(el[4].substring(1), 16))
                 scope.level.addChild(block)
             scope.player.position.set(json.entrance[0] * 64, Game.viewportSize - (json.entrance[1] * 64))
 
