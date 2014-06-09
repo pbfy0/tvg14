@@ -216,14 +216,14 @@ Game = (function() {
       var block, blocksize, c, cc, char, chs, colors, ex, ey, f, h, l, m, parts, row, w, x, x2, xx, xy, y, y2, _j, _k, _l, _len1, _len2, _len3, _ref1, _ref2, _ref3, _ref4;
       parts = xhr.responseText.trimRight().split('\n\n');
       colors = {};
-      blocksize = Number(parts[0]);
-      _ref1 = parts[1].split('\n');
+      blocksize = Number(parts[3] || 0) || 64;
+      _ref1 = parts[0].split('\n');
       for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
         row = _ref1[_j];
         _ref2 = row.split(' '), l = _ref2[0], c = _ref2[1];
         colors[l] = parseInt(c, 16);
       }
-      f = parts[2].split('\n');
+      f = parts[1].split('\n');
       cc = void 0;
       chs = {};
       for (y = _k = 0, _len2 = f.length; _k < _len2; y = ++_k) {
@@ -250,7 +250,7 @@ Game = (function() {
           scope.level.addChild(block);
         }
       }
-      m = parts[3].split('\n');
+      m = parts[2].split('\n');
       _ref3 = (function() {
         var _len4, _m, _ref3, _results;
         _ref3 = m[0].split(', ');
@@ -281,5 +281,6 @@ Game = (function() {
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
-  return window.game = new Game($('game'));
+  window.game = new Game($('game'));
+  return game.loadLevel('level/0');
 });

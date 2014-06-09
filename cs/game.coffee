@@ -121,12 +121,12 @@ class Game
         xhr.addEventListener 'load', (event) ->
             parts = xhr.responseText.trimRight().split('\n\n')
             colors = {}
-            blocksize = Number(parts[0])
-            for row in parts[1].split('\n')
+            blocksize = Number(parts[3] or 0) or 64
+            for row in parts[0].split('\n')
                 [l, c] = row.split(' ')
                 colors[l] = parseInt(c, 16)
 
-            f = parts[2].split('\n')
+            f = parts[1].split('\n')
             cc = undefined
             chs = {}
             for row, y in f
@@ -146,7 +146,7 @@ class Game
                     block = new Block(x*blocksize, y*blocksize, w*blocksize, h*blocksize, colors[char] or 0)
                     scope.level.addChild(block)
             
-            m = parts[3].split('\n')
+            m = parts[2].split('\n')
             [ex, ey] = (Number(x) for x in m[0].split(', '))
             [xx, xy] = (Number(x) for x in m[1].split(', '))
             scope.player.position.set(ex*64, Game.viewportSize - ey*64)
@@ -163,3 +163,4 @@ class Game
 
 document.addEventListener 'DOMContentLoaded', () ->
     window.game = new Game($('game'))
+    game.loadLevel('level/0')
