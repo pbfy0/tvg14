@@ -31,7 +31,7 @@
   Block = (function(_super) {
     __extends(Block, _super);
 
-    Block.pixel = PIXI.Texture.fromImage('img/pixel.bmp');
+    Block.pixel = PIXI.Texture.fromImage('img/pixel.png');
 
     function Block(x, y, width, height, tint) {
       Block.__super__.constructor.call(this, Block.pixel);

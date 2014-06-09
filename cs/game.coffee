@@ -16,7 +16,7 @@ PIXI.DisplayObjectContainer::bounds = () ->
     return r
 
 class Block extends PIXI.Sprite
-    @pixel: PIXI.Texture.fromImage('img/pixel.bmp')
+    @pixel: PIXI.Texture.fromImage('img/pixel.png')
     constructor: (x, y, width, height, tint) ->
         super(Block.pixel)
         @width = width
