@@ -1,4 +1,7 @@
 $ = document.getElementById.bind(document)
+if not String::trimRight?
+    String::trimRight = () ->
+        this.replace(/\s+$/, '')
 
 PIXI.DisplayObjectContainer::bounds = () ->
     r = new PIXI.Rectangle
@@ -16,7 +19,6 @@ class Block extends PIXI.Sprite
     @pixel: PIXI.Texture.fromImage('img/pixel.bmp')
     constructor: (x, y, width, height, tint) ->
         super(Block.pixel)
-        @anchor.set(0, 1)
         @width = width
         @height = height
         @tint = tint
@@ -117,16 +119,47 @@ class Game
         xhr = new XMLHttpRequest()
         xhr.open('GET', filename, true)
         xhr.addEventListener 'load', (event) ->
-            json = JSON.parse(xhr.responseText)
-            blocks = json.blocks
-            for el in blocks
-                block = new Block(el[0]*64, Game.viewportSize - el[1]*64, el[2]*64, el[3]*64, parseInt(el[4].substring(1), 16))
-                scope.level.addChild(block)
-            scope.player.position.set(json.entrance[0] * 64, Game.viewportSize - (json.entrance[1] * 64))
+            parts = xhr.responseText.trimRight().split('\n\n')
+            colors = {}
+            blocksize = Number(parts[0])
+            for row in parts[1].split('\n')
+                [l, c] = row.split(' ')
+                colors[l] = parseInt(c, 16)
+
+            f = parts[2].split('\n')
+            cc = undefined
+            chs = {}
+            for row, y in f
+                for char, x in row
+                    continue if chs[char]
+                    x2 = x
+                    y2 = y
+                    while x2 < row.length and row[x2] == char
+                        x2++
+                    x2--
+                    while y2 < f.length and f[y2][x2] == char
+                        y2++
+                    y2--
+                    chs[char] = true
+                    w = x2 - x + 1
+                    h = y2 - y + 1
+                    block = new Block(x*blocksize, y*blocksize, w*blocksize, h*blocksize, colors[char] or 0)
+                    scope.level.addChild(block)
+            
+            m = parts[3].split('\n')
+            [ex, ey] = (Number(x) for x in m[0].split(', '))
+            [xx, xy] = (Number(x) for x in m[1].split(', '))
+            scope.player.position.set(ex*64, Game.viewportSize - ey*64)
+
+            return
+
+
+#                block = new Block(el[0]*64, Game.viewportSize - el[1]*64, el[2]*64, el[3]*64, parseInt(el[4].substring(1), 16))
+#                scope.level.addChild(block)
+#            scope.player.position.set(json.entrance[0] * 64, Game.viewportSize - (json.entrance[1] * 64))
 
         xhr.send()
 
-game = undefined
 
 document.addEventListener 'DOMContentLoaded', () ->
-    game = new Game($('game'))
+    window.game = new Game($('game'))
