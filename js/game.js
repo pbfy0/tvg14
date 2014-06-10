@@ -13,7 +13,14 @@
     };
   }
 
-  PIXI.DisplayObjectContainer.prototype.bounds = function() {
+  Function.prototype.trigger = function(prop, getter, setter) {
+    return Object.defineProperty(this.prototype, prop, {
+      get: getter,
+      set: setter
+    });
+  };
+
+  PIXI.DisplayObjectContainer.prototype.calcwbounds = function() {
     var r;
     r = new PIXI.Rectangle;
     if (this.anchor != null) {
@@ -33,17 +40,50 @@
 
     Block.pixel = PIXI.Texture.fromImage('img/pixel.png');
 
-    function Block(x, y, width, height, tint) {
-      Block.__super__.constructor.call(this, Block.pixel);
+    function Block(x, y, width, height, boxColor) {
       this.width = width;
       this.height = height;
-      this.tint = tint;
+      Block.__super__.constructor.call(this);
+      this.boxColor = boxColor;
+      console.log(x, y, this.width, this.height);
       this.position.set(x, y);
+      this.hitArea = new PIXI.Rectangle(x, y, this.width, this.height);
     }
+
+    Block.prototype.redraw = function(lineColor) {
+      this.clear();
+      this.beginFill(this.boxColor);
+      this.lineStyle(1, lineColor || 0x222222);
+      this.drawRect(0, 0, this.width - 1, this.height - 1);
+      return this.endFill();
+    };
+
+    Block.trigger('boxColor', function() {
+      return this._boxColor;
+    }, function(val) {
+      this._boxColor = val;
+      return this.redraw();
+    });
+
+    Block.prototype.click = function(right) {
+      var boxColor;
+      if (game.selected !== null) {
+        boxColor = game.selected.boxColor;
+        if (!right) {
+          game.selected._boxColor = this.boxColor;
+        }
+        game.selected.redraw();
+        this.boxColor = boxColor;
+        return game.selected = null;
+      } else {
+        game.selected = this;
+        return this.redraw(0xff0000);
+      }
+    };
 
     return Block;
 
-  })(PIXI.Sprite);
+  })(PIXI.Graphics);
 
   Player = (function(_super) {
     __extends(Player, _super);
@@ -95,28 +135,30 @@
         }
         this.vy = 0;
       }
-      if (f == null) {
-        return;
-      }
-      celly = this.game.level.containingCell(this);
-      for (_i = 0, _len = celly.length; _i < _len; _i++) {
-        c = celly[_i];
-        if (__indexOf.call(cell, c) < 0) {
-          if (c.tint !== f.tint) {
-            this.position.y = oy;
-            if (this.vy > 0) {
-              this.onground = true;
+      if (f != null) {
+        celly = this.game.level.containingCell(this);
+        for (_i = 0, _len = celly.length; _i < _len; _i++) {
+          c = celly[_i];
+          if (__indexOf.call(cell, c) < 0) {
+            if (c.boxColor !== f.boxColor) {
+              this.position.y = oy;
+              if (this.vy > 0) {
+                this.onground = true;
+              }
+              this.vy = 0;
             }
-            this.vy = 0;
           }
         }
       }
       this.position.x += this.vx;
+      if (f == null) {
+        return;
+      }
       cellx = this.game.level.containingCell(this);
       for (_j = 0, _len1 = cellx.length; _j < _len1; _j++) {
         c = cellx[_j];
         if (__indexOf.call(cell, c) < 0) {
-          if (c.tint !== f.tint) {
+          if (c.boxColor !== f.boxColor) {
             this.position.x = ox;
           }
         }
@@ -163,19 +205,31 @@
     }
 
     Level.prototype.containingCell = function(doc) {
-      var b, cell, r, x1, x2, y1, y2, _i, _items, _len, _ref, _ref1;
-      r = doc.bounds();
-      _ref = [r.x, r.y, r.x + r.width, r.y + r.height], x1 = _ref[0], y1 = _ref[1], x2 = _ref[2], y2 = _ref[3];
+      var b, c, cell, x1, x2, y1, y2, _i, _items, _len, _ref, _ref1;
+      c = doc.calcwbounds();
+      _ref = [c.x, c.y, c.x + c.width, c.y + c.height], x1 = _ref[0], y1 = _ref[1], x2 = _ref[2], y2 = _ref[3];
       _items = [];
       _ref1 = this.children;
       for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
         cell = _ref1[_i];
-        b = cell.bounds();
+        b = cell.hitArea;
         if (b.contains(x1, y1) || b.contains(x2, y1) || b.contains(x1, y2) || b.contains(x2, y2)) {
           _items.push(cell);
         }
       }
       return _items;
+    };
+
+    Level.prototype.cellForCoords = function(x, y) {
+      var b, cell, _i, _len, _ref;
+      _ref = this.children;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        cell = _ref[_i];
+        b = cell.hitArea;
+        if (b.contains(x, y)) {
+          return cell;
+        }
+      }
     };
 
     return Level;
@@ -186,13 +240,33 @@
     Game.viewportSize = 512;
 
     function Game(el) {
+      var scope;
       this.stage = new PIXI.Stage(0x222222);
       this.renderer = PIXI.autoDetectRenderer(Game.viewportSize, Game.viewportSize, el);
       this.scroller = new ScrollContainer(this.stage);
       this.level = new Level(this.scroller);
       this.player = new Player(this);
       this.scroller.addChild(this.player);
+      this.selected = null;
       this.animate(this);
+      scope = this;
+      this.renderer.view.addEventListener('mouseup', function(event) {
+        var bounds, cell, elX, elY, lx, ly, _ref, _ref1;
+        event.preventDefault();
+        event = event || window.event;
+        bounds = scope.renderer.view.getBoundingClientRect();
+        _ref = [event.clientX - bounds.left, event.clientY - bounds.top], elX = _ref[0], elY = _ref[1];
+        _ref1 = [elX + scope.scroller.position.x, elY + scope.scroller.position.y], lx = _ref1[0], ly = _ref1[1];
+        cell = scope.level.cellForCoords(lx, ly);
+        if (cell) {
+          cell.click(event.which === 3 || event.button === 2);
+        }
+        return false;
+      });
+      this.renderer.view.addEventListener('contextmenu', function(event) {
+        event.preventDefault();
+        return false;
+      });
     }
 
     Game.prototype.animate = function(scope) {

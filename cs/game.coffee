@@ -3,7 +3,13 @@ if not String::trimRight?
     String::trimRight = () ->
         this.replace(/\s+$/, '')
 
-PIXI.DisplayObjectContainer::bounds = () ->
+Function::trigger = (prop, getter, setter) ->
+    Object.defineProperty @::, prop, 
+        get: getter
+        set: setter
+
+
+PIXI.DisplayObjectContainer::calcwbounds = () ->
     r = new PIXI.Rectangle
     if @anchor?
         r.x = @position.x - @anchor.x * @width
@@ -15,14 +21,35 @@ PIXI.DisplayObjectContainer::bounds = () ->
     r.height = @height
     return r
 
-class Block extends PIXI.Sprite
+class Block extends PIXI.Graphics
     @pixel: PIXI.Texture.fromImage('img/pixel.png')
-    constructor: (x, y, width, height, tint) ->
-        super(Block.pixel)
-        @width = width
-        @height = height
-        @tint = tint
+    constructor: (x, y, @width, @height, boxColor) ->
+        super()#Block.pixel)
+        @boxColor = boxColor
+        console.log(x, y, @width, @height)
         @position.set(x, y)
+        @hitArea = new PIXI.Rectangle(x, y, @width, @height)
+    redraw: (lineColor) ->
+        @clear()
+        @beginFill(@boxColor)
+        @lineStyle(1, lineColor || 0x222222)
+        @drawRect(0, 0, @width - 1, @height - 1)
+        @endFill()
+    @trigger 'boxColor', () ->
+        return @_boxColor
+    , (val) ->
+        @_boxColor = val
+        @redraw()
+    click: (right) ->
+        if game.selected != null
+            boxColor = game.selected.boxColor
+            game.selected._boxColor = @boxColor if not right
+            game.selected.redraw()
+            @boxColor = boxColor
+            game.selected = null
+        else
+            game.selected = @
+            @redraw(0xff0000)
 class Player extends PIXI.Sprite
     @texture = PIXI.Texture.fromImage('img/person.png')
     constructor: (@game) ->
@@ -54,19 +81,20 @@ class Player extends PIXI.Sprite
             @position.y = oy
             @onground = true if @vy > 0
             @vy = 0
-        return unless f?
-        celly = @game.level.containingCell(@)
-        for c in celly
-            if c not in cell
-                if c.tint != f.tint
-                    @position.y = oy
-                    @onground = true if @vy > 0
-                    @vy = 0
+        if f?
+            celly = @game.level.containingCell(@)
+            for c in celly
+                if c not in cell
+                    if c.boxColor != f.boxColor
+                        @position.y = oy
+                        @onground = true if @vy > 0
+                        @vy = 0
         @position.x += @vx
+        return unless f?
         cellx = @game.level.containingCell(@)
         for c in cellx
             if c not in cell
-                if c.tint != f.tint
+                if c.boxColor != f.boxColor
                     @position.x = ox
         return
 
@@ -86,15 +114,17 @@ class Level extends PIXI.DisplayObjectContainer
         super()
         parent.addChild(@)
     containingCell: (doc) ->
-        r = doc.bounds()
-        [x1, y1, x2, y2] = [r.x, r.y, r.x+r.width, r.y+r.height]
+        c = doc.calcwbounds()
+        [x1, y1, x2, y2] = [c.x, c.y, c.x+c.width, c.y+c.height]
         _items = []
         for cell in @children
-            b = cell.bounds()
+            b = cell.hitArea
             _items.push(cell) if b.contains(x1, y1) or b.contains(x2, y1) or b.contains(x1, y2) or b.contains(x2, y2)
-
         return _items
-    
+    cellForCoords: (x, y) ->
+        for cell in @children
+            b = cell.hitArea
+            return cell if b.contains(x, y)
 
 class Game
     @viewportSize: 512
@@ -105,7 +135,23 @@ class Game
         @level = new Level(@scroller)
         @player = new Player(@)
         @scroller.addChild(@player)
+        @selected = null
         @animate(@)
+        scope = @
+        @renderer.view.addEventListener 'mouseup', (event) ->
+            event.preventDefault()
+            event = event || window.event
+            bounds = scope.renderer.view.getBoundingClientRect()
+            [elX, elY] = [event.clientX - bounds.left, event.clientY - bounds.top]
+            [lx, ly] = [elX + scope.scroller.position.x, elY + scope.scroller.position.y]
+            cell = scope.level.cellForCoords(lx, ly)
+            cell.click(event.which == 3 or event.button == 2) if cell
+            return false
+        @renderer.view.addEventListener 'contextmenu', (event) ->
+            event.preventDefault()
+            return false
+
+
     animate: (scope) ->
         requestAnimFrame(() -> scope.animate(scope))
         scope.player.update()
