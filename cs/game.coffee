@@ -71,13 +71,13 @@ class Player extends PIXI.Sprite
                 scope.onground = false
         )
 
-    update: () ->
+    update: () -> # a royal mess
         [ox, oy] = [@position.x, @position.y]
         cell = @game.level.containingCell(@)
         f = cell[0]
         @vy += @g
         @position.y += @vy
-        if @position.y > Game.viewportSize
+        if @position.y > @game.level.height
             @position.y = oy
             @onground = true if @vy > 0
             @vy = 0
@@ -90,6 +90,10 @@ class Player extends PIXI.Sprite
                         @onground = true if @vy > 0
                         @vy = 0
         @position.x += @vx
+        if @position.x < 0 or @position.x > @game.level.width
+            @position.x = ox
+            @vx = 0
+            return
         return unless f?
         cellx = @game.level.containingCell(@)
         for c in cellx
@@ -175,6 +179,8 @@ class Game
             f = parts[1].split('\n')
             cc = undefined
             chs = {}
+            scope.level.width = f[0].length * blocksize
+            scope.level.height = f.length * blocksize
             for row, y in f
                 for char, x in row
                     continue if chs[char]
@@ -195,15 +201,8 @@ class Game
             m = parts[2].split('\n')
             [ex, ey] = (Number(x) for x in m[0].split(', '))
             [xx, xy] = (Number(x) for x in m[1].split(', '))
-            scope.player.position.set(ex*64, Game.viewportSize - ey*64)
-
+            scope.player.position.set(ex*64, scope.level.height - ey*64)
             return
-
-
-#                block = new Block(el[0]*64, Game.viewportSize - el[1]*64, el[2]*64, el[3]*64, parseInt(el[4].substring(1), 16))
-#                scope.level.addChild(block)
-#            scope.player.position.set(json.entrance[0] * 64, Game.viewportSize - (json.entrance[1] * 64))
-
         xhr.send()
 
 

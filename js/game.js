@@ -128,7 +128,7 @@
       f = cell[0];
       this.vy += this.g;
       this.position.y += this.vy;
-      if (this.position.y > Game.viewportSize) {
+      if (this.position.y > this.game.level.height) {
         this.position.y = oy;
         if (this.vy > 0) {
           this.onground = true;
@@ -151,6 +151,11 @@
         }
       }
       this.position.x += this.vx;
+      if (this.position.x < 0 || this.position.x > this.game.level.width) {
+        this.position.x = ox;
+        this.vx = 0;
+        return;
+      }
       if (f == null) {
         return;
       }
@@ -301,6 +306,8 @@
         f = parts[1].split('\n');
         cc = void 0;
         chs = {};
+        scope.level.width = f[0].length * blocksize;
+        scope.level.height = f.length * blocksize;
         for (y = _k = 0, _len2 = f.length; _k < _len2; y = ++_k) {
           row = f[y];
           for (x = _l = 0, _len3 = row.length; _l < _len3; x = ++_l) {
@@ -346,7 +353,7 @@
           }
           return _results;
         })(), xx = _ref4[0], xy = _ref4[1];
-        scope.player.position.set(ex * 64, Game.viewportSize - ey * 64);
+        scope.player.position.set(ex * 64, scope.level.height - ey * 64);
       });
       return xhr.send();
     };
