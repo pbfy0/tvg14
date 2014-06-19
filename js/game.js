@@ -375,7 +375,7 @@
     function Game(el) {
       var scope;
       this.stage = new PIXI.Stage(0x222222);
-      this.renderer = PIXI.autoDetectRenderer(0, 0, el);
+      this.renderer = new PIXI.WebGLRenderer(0, 0, el);
       this.viewport = new Viewport(this, window.innerWidth, window.innerHeight);
       this.stage.addChild(this.viewport);
       this.level = new Level(this);
@@ -384,6 +384,7 @@
       this.viewport.addChild(this.player);
       this.selected = null;
       this.animate(this);
+      this.tick(this);
       scope = this;
       this.renderer.view.addEventListener('mouseup', function(event) {
         var bounds, cell, elX, elY, rx, ry, _ref, _ref1;
@@ -394,7 +395,7 @@
         _ref1 = [elX - scope.viewport.position.x, elY - scope.viewport.position.y], rx = _ref1[0], ry = _ref1[1];
         cell = scope.level.cellForCoords(rx, ry);
         if (cell) {
-          cell.click();
+          cell.click(event.which === 3 || event.button === 2);
         }
         return false;
       });
@@ -418,8 +419,14 @@
       requestAnimFrame(function() {
         return scope.animate(scope);
       });
-      scope.player.update();
       return this.renderer.render(this.stage);
+    };
+
+    Game.prototype.tick = function(scope) {
+      setTimeout((function() {
+        return scope.tick(scope);
+      }), 1000 / 60);
+      return scope.player.update();
     };
 
     return Game;

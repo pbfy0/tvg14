@@ -214,7 +214,7 @@ class Level extends PIXI.DisplayObjectContainer
 class Game
     constructor: (el) ->
         @stage = new PIXI.Stage(0x222222)
-        @renderer = PIXI.autoDetectRenderer(0, 0, el)
+        @renderer = new PIXI.WebGLRenderer(0, 0, el)
         @viewport = new Viewport(@, window.innerWidth, window.innerHeight)
         @stage.addChild(@viewport)
         @level = new Level(@)
@@ -223,6 +223,7 @@ class Game
         @viewport.addChild(@player)
         @selected = null
         @animate(@)
+        @tick(@)
         scope = @
         @renderer.view.addEventListener 'mouseup', (event) ->
             event.preventDefault()
@@ -232,7 +233,7 @@ class Game
             [rx, ry] = [elX - scope.viewport.position.x, elY - scope.viewport.position.y]
 #            [lx, ly] = [rx + @viewport
             cell = scope.level.cellForCoords(rx, ry)
-            cell.click() if cell# event.which == 3 or event.button == 2
+            cell.click(event.which == 3 or event.button == 2) if cell
             return false
         @renderer.view.addEventListener 'contextmenu', (event) ->
             event.preventDefault()
@@ -248,8 +249,10 @@ class Game
 
     animate: (scope) ->
         requestAnimFrame(() -> scope.animate(scope))
-        scope.player.update()
         @renderer.render(@stage)
+    tick: (scope) ->
+        setTimeout((-> scope.tick(scope)), 1000/60)
+        scope.player.update()
 
 document.addEventListener 'DOMContentLoaded', () ->
     window.game = new Game($('game'))
