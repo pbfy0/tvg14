@@ -167,7 +167,7 @@ class Level extends PIXI.DisplayObjectContainer
             return cell if b.contains(x, y)
     load: (fn) ->
         for child in @children
-            @removeChild(@level.children[0])
+            @removeChild(@children[0])
         
         scope = @
         xhr = new XMLHttpRequest()

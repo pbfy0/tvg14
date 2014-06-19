@@ -295,7 +295,7 @@
       _ref = this.children;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         child = _ref[_i];
-        this.removeChild(this.level.children[0]);
+        this.removeChild(this.children[0]);
       }
       scope = this;
       xhr = new XMLHttpRequest();
