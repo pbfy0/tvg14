@@ -15,13 +15,12 @@
   }
 
   Object.prototype.chain = function(f) {
-    var scope;
-    scope = this;
+    var _this = this;
     return function() {
       var args;
       args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       f.apply(null, args);
-      return scope;
+      return _this;
     };
   };
 
@@ -132,21 +131,20 @@
     }
 
     Player.prototype.initKeys = function() {
-      var scope;
-      scope = this;
+      var _this = this;
       Mousetrap.bind(['a', 'left'], preventDefault(function() {
-        return scope.vx = -2;
+        return _this.vx = -2;
       }), 'keydown');
       Mousetrap.bind(['d', 'right'], preventDefault(function() {
-        return scope.vx = 2;
+        return _this.vx = 2;
       }), 'keydown');
       Mousetrap.bind(['a', 'd', 'left', 'right'], preventDefault(function() {
-        return scope.vx = 0;
+        return _this.vx = 0;
       }), 'keyup');
       return Mousetrap.bind(['w', 'up', 'space'], preventDefault(function() {
-        if (scope.onground) {
-          scope.vy = -10;
-          return scope.onground = false;
+        if (_this.onground) {
+          _this.vy = -10;
+          return _this.onground = false;
         }
       }, 'keydown'));
     };
@@ -291,13 +289,13 @@
     };
 
     Level.prototype.load = function(fn) {
-      var child, scope, xhr, _i, _len, _ref;
+      var child, xhr, _i, _len, _ref,
+        _this = this;
       _ref = this.children;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         child = _ref[_i];
         this.removeChild(this.children[0]);
       }
-      scope = this;
       xhr = new XMLHttpRequest();
       xhr.open('GET', fn, true);
       xhr.addEventListener('load', function(event) {
@@ -314,8 +312,8 @@
         f = parts[1].split('\n');
         cc = void 0;
         chs = {};
-        scope.width = f[0].length * blocksize;
-        scope.height = f.length * blocksize;
+        _this.width = f[0].length * blocksize;
+        _this.height = f.length * blocksize;
         for (y = _k = 0, _len2 = f.length; _k < _len2; y = ++_k) {
           row = f[y];
           for (x = _l = 0, _len3 = row.length; _l < _len3; x = ++_l) {
@@ -337,7 +335,7 @@
             w = x2 - x + 1;
             h = y2 - y + 1;
             block = new Block(x * blocksize, y * blocksize, w * blocksize, h * blocksize, colors[char] || 0);
-            scope.addChild(block);
+            _this.addChild(block);
           }
         }
         m = parts[2].split('\n');
@@ -361,8 +359,8 @@
           }
           return _results;
         })(), xx = _ref4[0], xy = _ref4[1];
-        scope.game.player.position.set(ex * blocksize, scope.height - ey * blocksize);
-        scope.game.viewport.position.y = scope.game.viewport.height - scope.height;
+        _this.game.player.position.set(ex * blocksize, _this.height - ey * blocksize);
+        _this.game.viewport.position.y = _this.game.viewport.height - _this.height;
       });
       return xhr.send();
     };
@@ -373,9 +371,9 @@
 
   Game = (function() {
     function Game(el) {
-      var scope;
+      var _this = this;
       this.stage = new PIXI.Stage(0x222222);
-      this.renderer = new PIXI.WebGLRenderer(0, 0, el);
+      this.renderer = PIXI.autoDetectRenderer(0, 0, el);
       this.viewport = new Viewport(this, window.innerWidth, window.innerHeight);
       this.stage.addChild(this.viewport);
       this.level = new Level(this);
@@ -385,15 +383,14 @@
       this.selected = null;
       this.animate(this);
       this.tick(this);
-      scope = this;
       this.renderer.view.addEventListener('mouseup', function(event) {
         var bounds, cell, elX, elY, rx, ry, _ref, _ref1;
         event.preventDefault();
         event = event || window.event;
-        bounds = scope.renderer.view.getBoundingClientRect();
+        bounds = _this.renderer.view.getBoundingClientRect();
         _ref = [event.clientX - bounds.left, event.clientY - bounds.top], elX = _ref[0], elY = _ref[1];
-        _ref1 = [elX - scope.viewport.position.x, elY - scope.viewport.position.y], rx = _ref1[0], ry = _ref1[1];
-        cell = scope.level.cellForCoords(rx, ry);
+        _ref1 = [elX - _this.viewport.position.x, elY - _this.viewport.position.y], rx = _ref1[0], ry = _ref1[1];
+        cell = _this.level.cellForCoords(rx, ry);
         if (cell) {
           cell.click(event.which === 3 || event.button === 2);
         }
@@ -404,10 +401,10 @@
         return false;
       });
       window.addEventListener('resize', function(ev) {
-        scope.viewport._height = window.innerHeight;
-        scope.viewport.position.y = scope.viewport.height - scope.level.height;
-        scope.viewport._width = window.innerWidth;
-        scope.viewport.height = window.innerHeight;
+        _this.viewport._height = window.innerHeight;
+        _this.viewport.position.y = _this.viewport.height - _this.level.height;
+        _this.viewport._width = window.innerWidth;
+        _this.viewport.height = window.innerHeight;
         return console.log(ev);
       });
       document.addEventListener('scroll', function(ev) {

@@ -1,12 +1,11 @@
 $ = document.getElementById.bind(document)
 if not String::trimRight?
-    String::trimRight = () ->
+    String::trimRight = ->
         this.replace(/\s+$/, '')
 Object::chain = (f) ->
-    scope = @
-    return (args...) ->
+    return (args...) =>
         f(args...)
-        return scope
+        return @
 
 preventDefault = (f) ->
     _wrap = (event) ->
@@ -23,7 +22,7 @@ Function::trigger = (prop, getter, setter) ->
         set: setter
 
 
-PIXI.DisplayObjectContainer::calcwbounds = () ->
+PIXI.DisplayObjectContainer::calcwbounds = ->
     r = new PIXI.Rectangle
     if @anchor?
         r.x = @position.x - @anchor.x * @width
@@ -48,7 +47,7 @@ class Block extends PIXI.Graphics
         @lineStyle(1, lineColor || 0x222222)
         @drawRect(0, 0, @width - 1, @height - 1)
         @endFill()
-    @trigger 'boxColor', () ->
+    @trigger 'boxColor', ->
         return @_boxColor
     , (val) ->
         @_boxColor = val
@@ -73,21 +72,20 @@ class Player extends PIXI.Sprite
         @g = 0.5
         @initKeys()
         @onground = false
-    initKeys: () ->
-        scope = @
-        Mousetrap.bind(['a', 'left'], (preventDefault () -> scope.vx = -2), 'keydown')
-        Mousetrap.bind(['d', 'right'], (preventDefault () -> scope.vx = 2), 'keydown')
-        Mousetrap.bind(['a', 'd', 'left', 'right'], (preventDefault () -> scope.vx = 0), 'keyup')
-        Mousetrap.bind(['w', 'up', 'space'], preventDefault () ->
-            if scope.onground
-                scope.vy = -10
-                scope.onground = false
+    initKeys: ->
+        Mousetrap.bind(['a', 'left'], (preventDefault => @vx = -2), 'keydown')
+        Mousetrap.bind(['d', 'right'], (preventDefault => @vx = 2), 'keydown')
+        Mousetrap.bind(['a', 'd', 'left', 'right'], (preventDefault => @vx = 0), 'keyup')
+        Mousetrap.bind(['w', 'up', 'space'], preventDefault =>
+            if @onground
+                @vy = -10
+                @onground = false
         , 'keydown')
 
-    update: () ->
+    update: ->
         @updatePhysics()
         @updateViewport()
-    updateViewport: () ->
+    updateViewport: ->
         [wx, wy] = [@position.x, @position.y]
         vw = @game.viewport.width
         vh = @game.viewport.height
@@ -101,7 +99,7 @@ class Player extends PIXI.Sprite
             @game.viewport.position.y = sy - @position.y
         #@game.viewport.setView(@position.x, @position.y)
         
-    updatePhysics: () -> # a royal mess
+    updatePhysics: -> # a royal mess
         [ox, oy] = [@position.x, @position.y]
         cell = @game.level.containingCell(@)
         f = cell[0]
@@ -138,13 +136,13 @@ class Viewport extends PIXI.DisplayObjectContainer
         super()
         @width = width
         @height = height
-    @trigger 'width', () ->
+    @trigger 'width', ->
         return @_width
     , (v) ->
         @_width = v
         @game.renderer.resize(@width, @height)
     
-    @trigger 'height', () ->
+    @trigger 'height', ->
         return @_height
     , (v) ->
         @_height = v
@@ -169,10 +167,9 @@ class Level extends PIXI.DisplayObjectContainer
         for child in @children
             @removeChild(@children[0])
         
-        scope = @
         xhr = new XMLHttpRequest()
         xhr.open('GET', fn, true)
-        xhr.addEventListener 'load', (event) ->
+        xhr.addEventListener 'load', (event) =>
             parts = xhr.responseText.trimRight().split('\n\n')
             colors = {}
             blocksize = Number(parts[3] or 0) or 64
@@ -183,8 +180,8 @@ class Level extends PIXI.DisplayObjectContainer
             f = parts[1].split('\n')
             cc = undefined
             chs = {}
-            scope.width = f[0].length * blocksize
-            scope.height = f.length * blocksize
+            @width = f[0].length * blocksize
+            @height = f.length * blocksize
             for row, y in f
                 for char, x in row
                     continue if chs[char]
@@ -200,13 +197,13 @@ class Level extends PIXI.DisplayObjectContainer
                     w = x2 - x + 1
                     h = y2 - y + 1
                     block = new Block(x*blocksize, y*blocksize, w*blocksize, h*blocksize, colors[char] or 0)
-                    scope.addChild(block)
+                    @addChild(block)
             
             m = parts[2].split('\n')
             [ex, ey] = (Number(x) for x in m[0].split(', '))
             [xx, xy] = (Number(x) for x in m[1].split(', '))
-            scope.game.player.position.set(ex*blocksize, scope.height - ey*blocksize)
-            scope.game.viewport.position.y = scope.game.viewport.height - scope.height
+            @game.player.position.set(ex*blocksize, @height - ey*blocksize)
+            @game.viewport.position.y = @game.viewport.height - @height
             return
         xhr.send()
 
@@ -214,7 +211,7 @@ class Level extends PIXI.DisplayObjectContainer
 class Game
     constructor: (el) ->
         @stage = new PIXI.Stage(0x222222)
-        @renderer = new PIXI.WebGLRenderer(0, 0, el)
+        @renderer = PIXI.autoDetectRenderer(0, 0, el)
         @viewport = new Viewport(@, window.innerWidth, window.innerHeight)
         @stage.addChild(@viewport)
         @level = new Level(@)
@@ -224,36 +221,35 @@ class Game
         @selected = null
         @animate(@)
         @tick(@)
-        scope = @
-        @renderer.view.addEventListener 'mouseup', (event) ->
+        @renderer.view.addEventListener 'mouseup', (event) =>
             event.preventDefault()
             event = event || window.event
-            bounds = scope.renderer.view.getBoundingClientRect()
+            bounds = @renderer.view.getBoundingClientRect()
             [elX, elY] = [event.clientX - bounds.left, event.clientY - bounds.top]
-            [rx, ry] = [elX - scope.viewport.position.x, elY - scope.viewport.position.y]
+            [rx, ry] = [elX - @viewport.position.x, elY - @viewport.position.y]
 #            [lx, ly] = [rx + @viewport
-            cell = scope.level.cellForCoords(rx, ry)
+            cell = @level.cellForCoords(rx, ry)
             cell.click(event.which == 3 or event.button == 2) if cell
             return false
         @renderer.view.addEventListener 'contextmenu', (event) ->
             event.preventDefault()
             return false
-        window.addEventListener 'resize', (ev) ->
-            scope.viewport._height = window.innerHeight
-            scope.viewport.position.y = scope.viewport.height - scope.level.height
-            scope.viewport._width = window.innerWidth
-            scope.viewport.height = window.innerHeight
+        window.addEventListener 'resize', (ev) =>
+            @viewport._height = window.innerHeight
+            @viewport.position.y = @viewport.height - @level.height
+            @viewport._width = window.innerWidth
+            @viewport.height = window.innerHeight
             console.log(ev)
         document.addEventListener 'scroll', (ev) ->
             ev.preventDefault()
 
     animate: (scope) ->
-        requestAnimFrame(() -> scope.animate(scope))
+        requestAnimFrame(-> scope.animate(scope))
         @renderer.render(@stage)
     tick: (scope) ->
         setTimeout((-> scope.tick(scope)), 1000/60)
         scope.player.update()
 
-document.addEventListener 'DOMContentLoaded', () ->
+document.addEventListener 'DOMContentLoaded', ->
     window.game = new Game($('game'))
     game.level.load('level/0')
