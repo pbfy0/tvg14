@@ -1,7 +1,7 @@
 $ = document.getElementById.bind(document)
 if not String::trimRight?
     String::trimRight = ->
-        this.replace(/\s+$/, '')
+        @replace(/\s+$/, '')
 Object::chain = (f) ->
     return (args...) =>
         f(args...)
@@ -85,6 +85,14 @@ class Player extends PIXI.Sprite
     update: ->
         @updatePhysics()
         @updateViewport()
+        return if not @game.level.exit?
+        bounds = @calcwbounds()
+        [x1, x2, y1, y2] = [bounds.x, bounds.x+bounds.width, bounds.y, bounds.y+bounds.height]
+        eb = @game.level.exit.hitArea
+        if (not @game.level.exit.exited) and (eb.contains(x1, y1) or eb.contains(x2, y1) or eb.contains(x1, y2) or eb.contains(x2, y2))
+            @game.level.exit.exited = true
+            @game.level.loadn(++@game.levelNumber)
+            
     updateViewport: ->
         [wx, wy] = [@position.x, @position.y]
         vw = @game.viewport.width
@@ -129,6 +137,21 @@ class Player extends PIXI.Sprite
                 if c.boxColor != f.boxColor
                     @position.x = ox
         return
+class Exit extends PIXI.Graphics
+    constructor: (@game, dir, size) ->
+        super()
+        @exited = false
+        @beginFill(0xaaaa00)
+        r = (switch dir
+            when 'l' then [0, 0, size/3, size]
+            when 't' then [0, 0, size, size/3]
+            when 'r' then [size*2/3, 0, size, size]
+            when 'b' then [0, size*2/3, size, size]
+        )
+        @drawRect(r...)
+        @endFill()
+        @width = @height = size
+        @hitArea = new PIXI.Rectangle(r[0] + @position.x, r[1] + @position.y, r[2] + @position.x, r[3] + @position.y)
 
 
 class Viewport extends PIXI.DisplayObjectContainer
@@ -150,22 +173,27 @@ class Viewport extends PIXI.DisplayObjectContainer
 
 class Level extends PIXI.DisplayObjectContainer
     constructor: (@game) ->
+        @blocks = []
+        @exit = undefined
         super()
     containingCell: (doc) ->
         c = doc.calcwbounds()
         [x1, y1, x2, y2] = [c.x, c.y, c.x+c.width, c.y+c.height]
         _items = []
-        for cell in @children
+        for cell in @blocks
             b = cell.hitArea
             _items.push(cell) if b.contains(x1, y1) or b.contains(x2, y1) or b.contains(x1, y2) or b.contains(x2, y2)
         return _items
     cellForCoords: (x, y) ->
-        for cell in @children
+        _items = []
+        for cell in @blocks
             b = cell.hitArea
-            return cell if b.contains(x, y)
+            _items.push(cell) if b.contains(x, y)
+        return _items[_items.length - 1]
     load: (fn) ->
         for child in @children
             @removeChild(@children[0])
+        @blocks = []
         
         xhr = new XMLHttpRequest()
         xhr.open('GET', fn, true)
@@ -198,14 +226,22 @@ class Level extends PIXI.DisplayObjectContainer
                     h = y2 - y + 1
                     block = new Block(x*blocksize, y*blocksize, w*blocksize, h*blocksize, colors[char] or 0)
                     @addChild(block)
+                    @blocks.push(block)
             
             m = parts[2].split('\n')
             [ex, ey] = (Number(x) for x in m[0].split(', '))
-            [xx, xy] = (Number(x) for x in m[1].split(', '))
+            z = m[1].split(', ')
+            xx = Number(z[0])
+            xy = Number(z[1])
+            @exit = new Exit(@, z[2], blocksize)
+            @exit.position.set(xx*blocksize, @height - xy*blocksize)
+            @addChild(@exit)
             @game.player.position.set(ex*blocksize, @height - ey*blocksize)
             @game.viewport.position.y = @game.viewport.height - @height
             return
         xhr.send()
+    loadn: (n) ->
+        @load('level/' + n)
 
 
 class Game
@@ -214,6 +250,7 @@ class Game
         @renderer = PIXI.autoDetectRenderer(0, 0, el)
         @viewport = new Viewport(@, window.innerWidth, window.innerHeight)
         @stage.addChild(@viewport)
+        @levelNumber = 0
         @level = new Level(@)
         @viewport.addChild(@level)
         @player = new Player(@)
@@ -252,4 +289,4 @@ class Game
 
 document.addEventListener 'DOMContentLoaded', ->
     window.game = new Game($('game'))
-    game.level.load('level/0')
+    game.level.loadn(0)
