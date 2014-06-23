@@ -195,7 +195,7 @@ class Level extends PIXI.DisplayObjectContainer
         xhr = new XMLHttpRequest()
         xhr.open('GET', fn, true)
         xhr.addEventListener 'load', (event) =>
-            parts = xhr.responseText.trimRight().split('\n\n')
+            parts = xhr.responseText.replace(/\r\n/g, '\n').trimRight().split('\n\n')
             colors = {}
             blocksize = Number(parts[3] or 0) or 64
             for row in parts[0].split('\n')

@@ -344,7 +344,7 @@
       xhr.open('GET', fn, true);
       xhr.addEventListener('load', function(event) {
         var block, blocksize, c, cc, char, chs, colors, ex, ey, f, h, l, m, parts, row, w, x, x2, xx, xy, y, y2, z, _j, _k, _l, _len1, _len2, _len3, _ref1, _ref2, _ref3;
-        parts = xhr.responseText.trimRight().split('\n\n');
+        parts = xhr.responseText.replace(/\r\n/g, '\n').trimRight().split('\n\n');
         colors = {};
         blocksize = Number(parts[3] || 0) || 64;
         _ref1 = parts[0].split('\n');
