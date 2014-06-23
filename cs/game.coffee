@@ -147,6 +147,7 @@ class Exit extends PIXI.Graphics
             when 't' then [0, 0, size, size/3]
             when 'r' then [size*2/3, 0, size, size]
             when 'b' then [0, size*2/3, size, size]
+            else [0, 0, size, size]
         )
         @drawRect(r...)
         @endFill()
@@ -157,19 +158,12 @@ class Exit extends PIXI.Graphics
 class Viewport extends PIXI.DisplayObjectContainer
     constructor: (@game, width, height) ->
         super()
+        window.addEventListener 'resize', =>
+            @width = window.innerWidth
+            @height = window.innerHeight
+            @game.player.updateViewport()
         @width = width
         @height = height
-    @trigger 'width', ->
-        return @_width
-    , (v) ->
-        @_width = v
-        @game.renderer.resize(@width, @height)
-    
-    @trigger 'height', ->
-        return @_height
-    , (v) ->
-        @_height = v
-        @game.renderer.resize(@width, @height)
 
 class Level extends PIXI.DisplayObjectContainer
     constructor: (@game) ->
@@ -194,6 +188,9 @@ class Level extends PIXI.DisplayObjectContainer
         for child in @children
             @removeChild(@children[0])
         @blocks = []
+        @game.player.visible = false
+        @game.renderer.render(@game.stage)
+        @game.suspended = true
         
         xhr = new XMLHttpRequest()
         xhr.open('GET', fn, true)
@@ -238,24 +235,49 @@ class Level extends PIXI.DisplayObjectContainer
             @addChild(@exit)
             @game.player.position.set(ex*blocksize, @height - ey*blocksize)
             @game.viewport.position.y = @game.viewport.height - @height
+            @game.player.visible = true
+            @game.suspended = false
             return
         xhr.send()
-    loadn: (n) ->
+    loadn: (n=@game.levelNumber) ->
         @load('level/' + n)
 
-
+class GameStateManager
+    constructor: (@game) ->
+        @titleScreen = PIXI.Sprite.fromImage('img/splash.png')
+    load: ->
+        s = localStorage.state
+        if s?
+            @game.levelNumber = s
+            @game.level.loadn()
+        else
+            @game.stage.addChild(@titleScreen)
+            @game.renderer.view.addEventListener 'click', =>
+                @game.state.removeChild(@titleScreen)
+                @game.levelNumber = 0
+                @game.level.loadn()
+                @game.renderer.view.removeEventListener 'click', arguments.callee
+                @window.addEventListener 'beforeunload', =>
+                    localStorage.state = @game.levelNumber
+    hideTitle: ->
+        @game.stage.removeChild(@titleScreen)
+        @game.levelNumber = 0
+        @game.level.loadn()
+        @game.renderer.view.removeEventListener 'click', @hideTitle
 class Game
     constructor: (el) ->
         @stage = new PIXI.Stage(0x222222)
         @renderer = PIXI.autoDetectRenderer(0, 0, el)
+        @sm = new GameStateManager(@)
+        @sm.load()
         @viewport = new Viewport(@, window.innerWidth, window.innerHeight)
         @stage.addChild(@viewport)
-        @levelNumber = 0
         @level = new Level(@)
         @viewport.addChild(@level)
         @player = new Player(@)
         @viewport.addChild(@player)
         @selected = null
+        @suspended = true
         @animate(@)
         @tick(@)
         @renderer.view.addEventListener 'mouseup', (event) =>
@@ -264,7 +286,6 @@ class Game
             bounds = @renderer.view.getBoundingClientRect()
             [elX, elY] = [event.clientX - bounds.left, event.clientY - bounds.top]
             [rx, ry] = [elX - @viewport.position.x, elY - @viewport.position.y]
-#            [lx, ly] = [rx + @viewport
             cell = @level.cellForCoords(rx, ry)
             cell.click(event.which == 3 or event.button == 2) if cell
             return false
@@ -272,21 +293,19 @@ class Game
             event.preventDefault()
             return false
         window.addEventListener 'resize', (ev) =>
-            @viewport._height = window.innerHeight
-            @viewport.position.y = @viewport.height - @level.height
-            @viewport._width = window.innerWidth
-            @viewport.height = window.innerHeight
+            @renderer.resize(window.innerWidth, window.innerHeight)
             console.log(ev)
         document.addEventListener 'scroll', (ev) ->
             ev.preventDefault()
 
     animate: (scope) ->
         requestAnimFrame(-> scope.animate(scope))
+        return if scope.suspended
         @renderer.render(@stage)
     tick: (scope) ->
         setTimeout((-> scope.tick(scope)), 1000/60)
+        return if scope.suspended
         scope.player.update()
 
 document.addEventListener 'DOMContentLoaded', ->
     window.game = new Game($('game'))
-    game.level.loadn(0)
