@@ -251,33 +251,28 @@ class GameStateManager
             @game.levelNumber = s
             @game.level.loadn()
         else
+            @game.level.loadn()
             @game.stage.addChild(@titleScreen)
             @game.renderer.view.addEventListener 'click', =>
-                @game.state.removeChild(@titleScreen)
-                @game.levelNumber = 0
-                @game.level.loadn()
+                @game.stage.removeChild(@titleScreen)
                 @game.renderer.view.removeEventListener 'click', arguments.callee
-                @window.addEventListener 'beforeunload', =>
+                window.addEventListener 'beforeunload', =>
                     localStorage.state = @game.levelNumber
-    hideTitle: ->
-        @game.stage.removeChild(@titleScreen)
-        @game.levelNumber = 0
-        @game.level.loadn()
-        @game.renderer.view.removeEventListener 'click', @hideTitle
 class Game
     constructor: (el) ->
         @stage = new PIXI.Stage(0x222222)
-        @renderer = PIXI.autoDetectRenderer(0, 0, el)
-        @sm = new GameStateManager(@)
-        @sm.load()
+        @renderer = PIXI.autoDetectRenderer(window.innerWidth, window.innerHeight, el)
         @viewport = new Viewport(@, window.innerWidth, window.innerHeight)
         @stage.addChild(@viewport)
         @level = new Level(@)
+        @levelNumber = 0
         @viewport.addChild(@level)
         @player = new Player(@)
         @viewport.addChild(@player)
+        @sm = new GameStateManager(@)
+        @sm.load()
         @selected = null
-        @suspended = true
+        @suspended = false
         @animate(@)
         @tick(@)
         @renderer.view.addEventListener 'mouseup', (event) =>

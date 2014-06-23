@@ -433,24 +433,16 @@
         this.game.levelNumber = s;
         return this.game.level.loadn();
       } else {
+        this.game.level.loadn();
         this.game.stage.addChild(this.titleScreen);
         return this.game.renderer.view.addEventListener('click', function() {
-          _this.game.state.removeChild(_this.titleScreen);
-          _this.game.levelNumber = 0;
-          _this.game.level.loadn();
+          _this.game.stage.removeChild(_this.titleScreen);
           _this.game.renderer.view.removeEventListener('click', arguments.callee);
-          return _this.window.addEventListener('beforeunload', function() {
+          return window.addEventListener('beforeunload', function() {
             return localStorage.state = _this.game.levelNumber;
           });
         });
       }
-    };
-
-    GameStateManager.prototype.hideTitle = function() {
-      this.game.stage.removeChild(this.titleScreen);
-      this.game.levelNumber = 0;
-      this.game.level.loadn();
-      return this.game.renderer.view.removeEventListener('click', this.hideTitle);
     };
 
     return GameStateManager;
@@ -461,17 +453,18 @@
     function Game(el) {
       var _this = this;
       this.stage = new PIXI.Stage(0x222222);
-      this.renderer = PIXI.autoDetectRenderer(0, 0, el);
-      this.sm = new GameStateManager(this);
-      this.sm.load();
+      this.renderer = PIXI.autoDetectRenderer(window.innerWidth, window.innerHeight, el);
       this.viewport = new Viewport(this, window.innerWidth, window.innerHeight);
       this.stage.addChild(this.viewport);
       this.level = new Level(this);
+      this.levelNumber = 0;
       this.viewport.addChild(this.level);
       this.player = new Player(this);
       this.viewport.addChild(this.player);
+      this.sm = new GameStateManager(this);
+      this.sm.load();
       this.selected = null;
-      this.suspended = true;
+      this.suspended = false;
       this.animate(this);
       this.tick(this);
       this.renderer.view.addEventListener('mouseup', function(event) {
