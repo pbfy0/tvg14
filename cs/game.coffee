@@ -99,12 +99,14 @@ class Player extends PIXI.Sprite
         vh = @game.viewport.height
         lw = @game.level.width
         lh = @game.level.height
-        sx = (vw - (lw - vw)) / 2
-        sy = (vh - (lh - vh)) / 2
-        if wx > sx and wx < (vw + (lw - vw)) / 2
-            @game.viewport.position.x = sx - @position.x
-        if wy > sy and wy < (vh + (lh - vh)) / 2
-            @game.viewport.position.y = sy - @position.y
+        wd = lw - vw
+        hd = lh - vh
+        sx = vw/2 - wd / 2#(vw - (lw - vw)) / 2
+        sy = vh/2 - hd / 2#(vh - (lh - vh)) / 2
+        @game.viewport.position.x = if wd > 0 then constrain(sx - wx, -wd, 0) else wd / -2
+        @game.viewport.position.y = if hd > 0 then constrain(sy - wy, -hd, 0) else hd / -2
+        #if wy > sy and wy < (vh + (lh - vh)) / 2
+        #    @game.viewport.position.y = sy - @position.y
         #@game.viewport.setView(@position.x, @position.y)
         
     updatePhysics: -> # a royal mess
@@ -188,7 +190,6 @@ class Level extends PIXI.DisplayObjectContainer
         for child in @children
             @removeChild(@children[0])
         @blocks = []
-        @game.player.visible = false
         @game.renderer.render(@game.stage)
         @game.suspended = true
         
@@ -234,8 +235,6 @@ class Level extends PIXI.DisplayObjectContainer
             @exit.position.set(xx*blocksize, @height - xy*blocksize)
             @addChild(@exit)
             @game.player.position.set(ex*blocksize, @height - ey*blocksize)
-            @game.viewport.position.y = @game.viewport.height - @height
-            @game.player.visible = true
             @game.suspended = false
             return
         xhr.send()
@@ -248,16 +247,25 @@ class GameStateManager
     load: ->
         s = localStorage.state
         if s?
-            @game.levelNumber = s
-            @game.level.loadn()
+            @startGame(s)
         else
+            @game.player.visible = false
             @game.level.loadn()
             @game.stage.addChild(@titleScreen)
+            @titleScreen.texture.baseTexture.source.addEventListener 'load', =>
+                x = => @titleScreen.position.set((window.innerWidth - @titleScreen.width) / 2, (window.innerHeight - @titleScreen.height) / 2)
+                x()
+                window.addEventListener 'resize', x
             @game.renderer.view.addEventListener 'click', =>
                 @game.stage.removeChild(@titleScreen)
                 @game.renderer.view.removeEventListener 'click', arguments.callee
-                window.addEventListener 'beforeunload', =>
-                    localStorage.state = @game.levelNumber
+                @game.player.visible = true
+                @startGame(0)
+    startGame: (n) ->
+        @game.levelNumber = n
+        @game.level.loadn()
+        window.addEventListener 'beforeunload', =>
+            localStorage.state = @game.levelNumber
 class Game
     constructor: (el) ->
         @stage = new PIXI.Stage(0x222222)
@@ -276,6 +284,7 @@ class Game
         @animate(@)
         @tick(@)
         @renderer.view.addEventListener 'mouseup', (event) =>
+            return unless @player.visible
             event.preventDefault()
             event = event || window.event
             bounds = @renderer.view.getBoundingClientRect()

@@ -166,20 +166,18 @@
     };
 
     Player.prototype.updateViewport = function() {
-      var lh, lw, sx, sy, vh, vw, wx, wy, _ref;
+      var hd, lh, lw, sx, sy, vh, vw, wd, wx, wy, _ref;
       _ref = [this.position.x, this.position.y], wx = _ref[0], wy = _ref[1];
       vw = this.game.viewport.width;
       vh = this.game.viewport.height;
       lw = this.game.level.width;
       lh = this.game.level.height;
-      sx = (vw - (lw - vw)) / 2;
-      sy = (vh - (lh - vh)) / 2;
-      if (wx > sx && wx < (vw + (lw - vw)) / 2) {
-        this.game.viewport.position.x = sx - this.position.x;
-      }
-      if (wy > sy && wy < (vh + (lh - vh)) / 2) {
-        return this.game.viewport.position.y = sy - this.position.y;
-      }
+      wd = lw - vw;
+      hd = lh - vh;
+      sx = vw / 2 - wd / 2;
+      sy = vh / 2 - hd / 2;
+      this.game.viewport.position.x = wd > 0 ? constrain(sx - wx, -wd, 0) : wd / -2;
+      return this.game.viewport.position.y = hd > 0 ? constrain(sy - wy, -hd, 0) : hd / -2;
     };
 
     Player.prototype.updatePhysics = function() {
@@ -337,7 +335,6 @@
         this.removeChild(this.children[0]);
       }
       this.blocks = [];
-      this.game.player.visible = false;
       this.game.renderer.render(this.game.stage);
       this.game.suspended = true;
       xhr = new XMLHttpRequest();
@@ -401,8 +398,6 @@
         _this.exit.position.set(xx * blocksize, _this.height - xy * blocksize);
         _this.addChild(_this.exit);
         _this.game.player.position.set(ex * blocksize, _this.height - ey * blocksize);
-        _this.game.viewport.position.y = _this.game.viewport.height - _this.height;
-        _this.game.player.visible = true;
         _this.game.suspended = false;
       });
       return xhr.send();
@@ -430,19 +425,35 @@
         _this = this;
       s = localStorage.state;
       if (s != null) {
-        this.game.levelNumber = s;
-        return this.game.level.loadn();
+        return this.startGame(s);
       } else {
+        this.game.player.visible = false;
         this.game.level.loadn();
         this.game.stage.addChild(this.titleScreen);
+        this.titleScreen.texture.baseTexture.source.addEventListener('load', function() {
+          var x;
+          x = function() {
+            return _this.titleScreen.position.set((window.innerWidth - _this.titleScreen.width) / 2, (window.innerHeight - _this.titleScreen.height) / 2);
+          };
+          x();
+          return window.addEventListener('resize', x);
+        });
         return this.game.renderer.view.addEventListener('click', function() {
           _this.game.stage.removeChild(_this.titleScreen);
           _this.game.renderer.view.removeEventListener('click', arguments.callee);
-          return window.addEventListener('beforeunload', function() {
-            return localStorage.state = _this.game.levelNumber;
-          });
+          _this.game.player.visible = true;
+          return _this.startGame(0);
         });
       }
+    };
+
+    GameStateManager.prototype.startGame = function(n) {
+      var _this = this;
+      this.game.levelNumber = n;
+      this.game.level.loadn();
+      return window.addEventListener('beforeunload', function() {
+        return localStorage.state = _this.game.levelNumber;
+      });
     };
 
     return GameStateManager;
@@ -469,6 +480,9 @@
       this.tick(this);
       this.renderer.view.addEventListener('mouseup', function(event) {
         var bounds, cell, elX, elY, rx, ry, _ref, _ref1;
+        if (!_this.player.visible) {
+          return;
+        }
         event.preventDefault();
         event = event || window.event;
         bounds = _this.renderer.view.getBoundingClientRect();
