@@ -23,6 +23,11 @@ Function::trigger = (prop, getter, setter) ->
         get: getter
         set: setter
 
+PIXI.Texture::setFrame = (@frame) ->
+    @width = @frame.width
+    @height = @frame.height
+    @updateFrame = true
+    PIXI.Texture.frameUpdates.push(@)
 
 PIXI.DisplayObjectContainer::calcwbounds = ->
     r = new PIXI.Rectangle
@@ -37,7 +42,7 @@ PIXI.DisplayObjectContainer::calcwbounds = ->
     return r
 
 class Block extends PIXI.Graphics
-    constructor: (x, y, @width, @height, boxColor) ->
+    constructor: (x, y, @width, @height, boxColor, @locked=false) ->
         super()#Block.pixel)
         @boxColor = boxColor
         console.log(x, y, @width, @height)
@@ -46,7 +51,7 @@ class Block extends PIXI.Graphics
     redraw: (lineColor) ->
         @clear()
         @beginFill(@boxColor)
-        @lineStyle(1, lineColor || 0x222222)
+        @lineStyle(1, if @locked then 0x0000ff else lineColor || 0x222222)
         @drawRect(0, 0, @width - 1, @height - 1)
         @endFill()
     @trigger 'boxColor', ->
@@ -55,6 +60,7 @@ class Block extends PIXI.Graphics
         @_boxColor = val
         @redraw()
     click: (right) ->
+        return if @locked
         if game.selected != null
             boxColor = game.selected.boxColor
             game.selected._boxColor = @boxColor if not right
@@ -113,13 +119,16 @@ class Player extends PIXI.MovieClip
         eb = @game.level.exit.hitArea
         if (not @game.level.exit.exited) and (eb.contains(x1, y1) or eb.contains(x2, y1) or eb.contains(x1, y2) or eb.contains(x2, y2))
             @game.level.exit.exited = true
-            @game.level.loadn(++@game.levelNumber)
+            if ++@game.levelNumber > 4
+                @game.win()
+            else
+                @game.level.loadn()
     updateAnimate: ->
         cset = @textures
-        switch
-            when @vx < 0 then @setAnimSet(if @onground then 'left' else 'jumpleft')
-            when @vx == 0 then @setAnimSet(if @onground then 'stand' else 'jump')
-            when @vx > 0 then @setAnimSet(if @onground then 'right' else 'jumpright')
+        if @vx < 0 then @setAnimSet(if @onground then 'left' else 'jumpleft')
+        else if @vx == 0 and not @onground then @setAnimSet('jump')
+        else if @vx > 0 then @setAnimSet(if @onground then 'right' else 'jumpright')
+        @playing = not (@vx == 0 and @onground)
         if @textures != cset then @gotoAndPlay(0)
     updateViewport: ->
         [wx, wy] = [@position.x, @position.y]
@@ -143,7 +152,7 @@ class Player extends PIXI.MovieClip
         f = cell[0]
         @vy += @g
         @position.y += @vy
-        if @position.y > @game.level.height
+        if @position.y > @game.level.height or @position.y - @height < 0
             @position.y = oy
             @onground = true if @vy > 0
             @vy = 0
@@ -167,23 +176,23 @@ class Player extends PIXI.MovieClip
                 if c.boxColor != f.boxColor
                     @position.x = ox
         return
-class Exit extends PIXI.Graphics
-    constructor: (@game, x, y, dir, size) ->
-        super()
+class Exit extends PIXI.Sprite
+    @texture = PIXI.Texture.fromImage('img/circuit.png')
+    constructor: (@game, x, y, dir) ->
+        super(Exit.texture)
+        @width = @height = 64
         @exited = false
-        @beginFill(0xaaaa00)
-        r = (switch dir
-            when 'l' then [0, 0, size/3, size]
-            when 't' then [0, 0, size, size/3]
-            when 'r' then [size*2/3, 0, size/3, size]
-            when 'b' then [0, size*2/3, size, size/3]
-            else [0, 0, size, size]
-        )
-        @drawRect(r...)
-        @endFill()
-        @width = @height = size
         @position.set(x, y)
-        @hitArea = new PIXI.Rectangle(r[0] + @position.x, r[1] + @position.y, r[2] + @position.x, r[3] + @position.y)
+        @hitArea = new PIXI.Rectangle(x, y, 64, 64)
+
+class Ending extends PIXI.DisplayObjectContainer
+    constructor: (@game) ->
+        super()
+        @width = 500
+        @height = 100
+        win = new PIXI.Text('You win', {font: 'bold 100px Arial'})
+        win.position.set((@game.renderer.width - @width) / 2, 50)
+        @addChild(win)
 
 
 class Viewport extends PIXI.DisplayObjectContainer
@@ -216,6 +225,7 @@ class Level extends PIXI.DisplayObjectContainer
             _items.push(cell) if b.contains(x, y)
         return _items[_items.length - 1]
     load: (fn) ->
+        @game.selected = null
         for child in @children
             @removeChild(@children[0])
         @blocks = []
@@ -227,11 +237,12 @@ class Level extends PIXI.DisplayObjectContainer
         xhr.addEventListener 'load', (event) =>
             parts = xhr.responseText.replace(/\r\n/g, '\n').trimRight().split('\n\n')
             colors = {}
+            locked = {}
             blocksize = Number(parts[3] or 0) or 64
             for row in parts[0].split('\n')
-                [l, c] = row.split(' ')
+                [l, c, lo] = row.split(' ')
                 colors[l] = parseInt(c, 16)
-
+                locked[l] = lo == 'l'
             f = parts[1].split('\n')
             cc = undefined
             chs = {}
@@ -251,7 +262,7 @@ class Level extends PIXI.DisplayObjectContainer
                     chs[char] = true
                     w = x2 - x + 1
                     h = y2 - y + 1
-                    block = new Block(x*blocksize, y*blocksize, w*blocksize, h*blocksize, colors[char] or 0)
+                    block = new Block(x*blocksize, y*blocksize, w*blocksize, h*blocksize, colors[char] or 0, locked[char])
                     @addChild(block)
                     @blocks.push(block)
             
@@ -273,10 +284,10 @@ class GameStateManager
     constructor: (@game) ->
         @titleScreen = PIXI.Sprite.fromImage('img/splash.png')
     load: ->
-#        s = localStorage.state
-#        if s?
-#            @startGame(s)
-#        else
+        s = localStorage.state
+        if s?
+            @startGame(s)
+        else
             @game.player.visible = false
             @game.level.loadn()
             @game.stage.addChild(@titleScreen)
@@ -319,7 +330,7 @@ class Game
             [elX, elY] = [event.clientX - bounds.left, event.clientY - bounds.top]
             [rx, ry] = [elX - @viewport.position.x, elY - @viewport.position.y]
             cell = @level.cellForCoords(rx, ry)
-            cell.click(event.which == 3 or event.button == 2) if cell
+            cell.click() if cell #event.which == 3 or event.button == 2) if cell
             return false
         @renderer.view.addEventListener 'contextmenu', (event) ->
             event.preventDefault()
@@ -338,6 +349,12 @@ class Game
         setTimeout((-> scope.tick(scope)), 1000/60)
         return if scope.suspended
         scope.player.update()
+    
+    win: ->
+        for i in @stage.children
+            @stage.removeChild(@stage.children[0])
+        @ending = new Ending(@)
+        @stage.addChild(@ending)
 
 Player.loader.addEventListener 'loaded', ->
     window.game = new Game($('game'))

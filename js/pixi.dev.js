@@ -12151,10 +12151,10 @@ PIXI.Texture.prototype.setFrame = function(frame)
     this.width = frame.width;
     this.height = frame.height;
 
-    //if(frame.x + frame.width > this.baseTexture.width || frame.y + frame.height > this.baseTexture.height)
-    //{
-        //throw new Error('Texture Error: frame does not fit inside the base Texture dimensions ' + this);
-    //}
+    if(frame.x + frame.width > this.baseTexture.width || frame.y + frame.height > this.baseTexture.height)
+    {
+        throw new Error('Texture Error: frame does not fit inside the base Texture dimensions ' + this);
+    }
 
     this.updateFrame = true;
 
