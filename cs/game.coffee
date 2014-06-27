@@ -2,6 +2,8 @@ $ = document.getElementById.bind(document)
 if not String::trimRight?
     String::trimRight = ->
         @replace(/\s+$/, '')
+String::lpad = (n, v='0') ->
+    if @length > n then @ else new Array(n-@length+1).join(v) + @
 Object::chain = (f) ->
     return (args...) =>
         f(args...)
@@ -62,20 +64,39 @@ class Block extends PIXI.Graphics
         else
             game.selected = @
             @redraw(0xff0000)
-class Player extends PIXI.Sprite
-    @texture = PIXI.Texture.fromImage('img/person.png')
+class Player extends PIXI.MovieClip
+    #@texture = PIXI.Texture.fromImage('img/person.png')
+    @animations = {}
+    @loader = new PIXI.SpriteSheetLoader('img/player.json')
+    @loader.addEventListener 'loaded', =>
+        ani_names = {'stand': 0, 'left': 91, 'right': 91, 'jump': 91, 'jumpleft': 91, 'jumpright': 91}
+        for name, n of ani_names
+            a = (PIXI.Texture.fromFrame("#{name}_#{String(i).lpad(2)}.png") for i in [0..n])
+            @animations[name] = a
+        return
+    @loader.load()
     constructor: (@game) ->
-        super(Player.texture)
+        super(Player.animations.stand)
+        @loop = true
+        @play()
         @anchor.set(0, 1)
         @vx = 0
         @vy = 0
         @g = 0.5
         @initKeys()
         @onground = false
+    setAnimSet: (name) ->
+        @textures = Player.animations[name]
     initKeys: ->
-        Mousetrap.bind(['a', 'left'], (preventDefault => @vx = -2), 'keydown')
-        Mousetrap.bind(['d', 'right'], (preventDefault => @vx = 2), 'keydown')
-        Mousetrap.bind(['a', 'd', 'left', 'right'], (preventDefault => @vx = 0), 'keyup')
+        Mousetrap.bind(['a', 'left'], (preventDefault =>
+            @vx = -2
+        ), 'keydown')
+        Mousetrap.bind(['d', 'right'], (preventDefault =>
+            @vx = 2
+        ), 'keydown')
+        Mousetrap.bind(['a', 'd', 'left', 'right'], (preventDefault =>
+            @vx = 0
+        ), 'keyup')
         Mousetrap.bind(['w', 'up', 'space'], preventDefault =>
             if @onground
                 @vy = -10
@@ -85,6 +106,7 @@ class Player extends PIXI.Sprite
     update: ->
         @updatePhysics()
         @updateViewport()
+        @updateAnimate()
         return if not @game.level.exit?
         bounds = @calcwbounds()
         [x1, x2, y1, y2] = [bounds.x, bounds.x+bounds.width, bounds.y, bounds.y+bounds.height]
@@ -92,7 +114,13 @@ class Player extends PIXI.Sprite
         if (not @game.level.exit.exited) and (eb.contains(x1, y1) or eb.contains(x2, y1) or eb.contains(x1, y2) or eb.contains(x2, y2))
             @game.level.exit.exited = true
             @game.level.loadn(++@game.levelNumber)
-            
+    updateAnimate: ->
+        cset = @textures
+        switch
+            when @vx < 0 then @setAnimSet(if @onground then 'left' else 'jumpleft')
+            when @vx == 0 then @setAnimSet(if @onground then 'stand' else 'jump')
+            when @vx > 0 then @setAnimSet(if @onground then 'right' else 'jumpright')
+        if @textures != cset then @gotoAndPlay(0)
     updateViewport: ->
         [wx, wy] = [@position.x, @position.y]
         vw = @game.viewport.width
@@ -140,20 +168,21 @@ class Player extends PIXI.Sprite
                     @position.x = ox
         return
 class Exit extends PIXI.Graphics
-    constructor: (@game, dir, size) ->
+    constructor: (@game, x, y, dir, size) ->
         super()
         @exited = false
         @beginFill(0xaaaa00)
         r = (switch dir
             when 'l' then [0, 0, size/3, size]
             when 't' then [0, 0, size, size/3]
-            when 'r' then [size*2/3, 0, size, size]
-            when 'b' then [0, size*2/3, size, size]
+            when 'r' then [size*2/3, 0, size/3, size]
+            when 'b' then [0, size*2/3, size, size/3]
             else [0, 0, size, size]
         )
         @drawRect(r...)
         @endFill()
         @width = @height = size
+        @position.set(x, y)
         @hitArea = new PIXI.Rectangle(r[0] + @position.x, r[1] + @position.y, r[2] + @position.x, r[3] + @position.y)
 
 
@@ -231,8 +260,7 @@ class Level extends PIXI.DisplayObjectContainer
             z = m[1].split(', ')
             xx = Number(z[0])
             xy = Number(z[1])
-            @exit = new Exit(@, z[2], blocksize)
-            @exit.position.set(xx*blocksize, @height - xy*blocksize)
+            @exit = new Exit(@, xx*blocksize, @height - (xy+1)*blocksize, z[2], blocksize)
             @addChild(@exit)
             @game.player.position.set(ex*blocksize, @height - ey*blocksize)
             @game.suspended = false
@@ -245,10 +273,10 @@ class GameStateManager
     constructor: (@game) ->
         @titleScreen = PIXI.Sprite.fromImage('img/splash.png')
     load: ->
-        s = localStorage.state
-        if s?
-            @startGame(s)
-        else
+#        s = localStorage.state
+#        if s?
+#            @startGame(s)
+#        else
             @game.player.visible = false
             @game.level.loadn()
             @game.stage.addChild(@titleScreen)
@@ -311,5 +339,5 @@ class Game
         return if scope.suspended
         scope.player.update()
 
-document.addEventListener 'DOMContentLoaded', ->
+Player.loader.addEventListener 'loaded', ->
     window.game = new Game($('game'))

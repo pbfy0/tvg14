@@ -14,6 +14,17 @@
     };
   }
 
+  String.prototype.lpad = function(n, v) {
+    if (v == null) {
+      v = '0';
+    }
+    if (this.length > n) {
+      return this;
+    } else {
+      return new Array(n - this.length + 1).join(v) + this;
+    }
+  };
+
   Object.prototype.chain = function(f) {
     var _this = this;
     return function() {
@@ -115,13 +126,45 @@
   })(PIXI.Graphics);
 
   Player = (function(_super) {
+    var _this = this;
+
     __extends(Player, _super);
 
-    Player.texture = PIXI.Texture.fromImage('img/person.png');
+    Player.animations = {};
+
+    Player.loader = new PIXI.SpriteSheetLoader('img/player.json');
+
+    Player.loader.addEventListener('loaded', function() {
+      var a, ani_names, i, n, name;
+      ani_names = {
+        'stand': 0,
+        'left': 91,
+        'right': 91,
+        'jump': 91,
+        'jumpleft': 91,
+        'jumpright': 91
+      };
+      for (name in ani_names) {
+        n = ani_names[name];
+        a = (function() {
+          var _i, _results;
+          _results = [];
+          for (i = _i = 0; 0 <= n ? _i <= n : _i >= n; i = 0 <= n ? ++_i : --_i) {
+            _results.push(PIXI.Texture.fromFrame("" + name + "_" + (String(i).lpad(2)) + ".png"));
+          }
+          return _results;
+        })();
+        Player.animations[name] = a;
+      }
+    });
+
+    Player.loader.load();
 
     function Player(game) {
       this.game = game;
-      Player.__super__.constructor.call(this, Player.texture);
+      Player.__super__.constructor.call(this, Player.animations.stand);
+      this.loop = true;
+      this.play();
       this.anchor.set(0, 1);
       this.vx = 0;
       this.vy = 0;
@@ -129,6 +172,10 @@
       this.initKeys();
       this.onground = false;
     }
+
+    Player.prototype.setAnimSet = function(name) {
+      return this.textures = Player.animations[name];
+    };
 
     Player.prototype.initKeys = function() {
       var _this = this;
@@ -153,6 +200,7 @@
       var bounds, eb, x1, x2, y1, y2, _ref;
       this.updatePhysics();
       this.updateViewport();
+      this.updateAnimate();
       if (this.game.level.exit == null) {
         return;
       }
@@ -162,6 +210,24 @@
       if ((!this.game.level.exit.exited) && (eb.contains(x1, y1) || eb.contains(x2, y1) || eb.contains(x1, y2) || eb.contains(x2, y2))) {
         this.game.level.exit.exited = true;
         return this.game.level.loadn(++this.game.levelNumber);
+      }
+    };
+
+    Player.prototype.updateAnimate = function() {
+      var cset;
+      cset = this.textures;
+      switch (false) {
+        case !(this.vx < 0):
+          this.setAnimSet(this.onground ? 'left' : 'jumpleft');
+          break;
+        case this.vx !== 0:
+          this.setAnimSet(this.onground ? 'stand' : 'jump');
+          break;
+        case !(this.vx > 0):
+          this.setAnimSet(this.onground ? 'right' : 'jumpright');
+      }
+      if (this.textures !== cset) {
+        return this.gotoAndPlay(0);
       }
     };
 
@@ -231,12 +297,12 @@
 
     return Player;
 
-  })(PIXI.Sprite);
+  }).call(this, PIXI.MovieClip);
 
   Exit = (function(_super) {
     __extends(Exit, _super);
 
-    function Exit(game, dir, size) {
+    function Exit(game, x, y, dir, size) {
       var r;
       this.game = game;
       Exit.__super__.constructor.call(this);
@@ -249,9 +315,9 @@
           case 't':
             return [0, 0, size, size / 3];
           case 'r':
-            return [size * 2 / 3, 0, size, size];
+            return [size * 2 / 3, 0, size / 3, size];
           case 'b':
-            return [0, size * 2 / 3, size, size];
+            return [0, size * 2 / 3, size, size / 3];
           default:
             return [0, 0, size, size];
         }
@@ -259,6 +325,7 @@
       this.drawRect.apply(this, r);
       this.endFill();
       this.width = this.height = size;
+      this.position.set(x, y);
       this.hitArea = new PIXI.Rectangle(r[0] + this.position.x, r[1] + this.position.y, r[2] + this.position.x, r[3] + this.position.y);
     }
 
@@ -394,8 +461,7 @@
         z = m[1].split(', ');
         xx = Number(z[0]);
         xy = Number(z[1]);
-        _this.exit = new Exit(_this, z[2], blocksize);
-        _this.exit.position.set(xx * blocksize, _this.height - xy * blocksize);
+        _this.exit = new Exit(_this, xx * blocksize, _this.height - (xy + 1) * blocksize, z[2], blocksize);
         _this.addChild(_this.exit);
         _this.game.player.position.set(ex * blocksize, _this.height - ey * blocksize);
         _this.game.suspended = false;
@@ -421,30 +487,24 @@
     }
 
     GameStateManager.prototype.load = function() {
-      var s,
-        _this = this;
-      s = localStorage.state;
-      if (s != null) {
-        return this.startGame(s);
-      } else {
-        this.game.player.visible = false;
-        this.game.level.loadn();
-        this.game.stage.addChild(this.titleScreen);
-        this.titleScreen.texture.baseTexture.source.addEventListener('load', function() {
-          var x;
-          x = function() {
-            return _this.titleScreen.position.set((window.innerWidth - _this.titleScreen.width) / 2, (window.innerHeight - _this.titleScreen.height) / 2);
-          };
-          x();
-          return window.addEventListener('resize', x);
-        });
-        return this.game.renderer.view.addEventListener('click', function() {
-          _this.game.stage.removeChild(_this.titleScreen);
-          _this.game.renderer.view.removeEventListener('click', arguments.callee);
-          _this.game.player.visible = true;
-          return _this.startGame(0);
-        });
-      }
+      var _this = this;
+      this.game.player.visible = false;
+      this.game.level.loadn();
+      this.game.stage.addChild(this.titleScreen);
+      this.titleScreen.texture.baseTexture.source.addEventListener('load', function() {
+        var x;
+        x = function() {
+          return _this.titleScreen.position.set((window.innerWidth - _this.titleScreen.width) / 2, (window.innerHeight - _this.titleScreen.height) / 2);
+        };
+        x();
+        return window.addEventListener('resize', x);
+      });
+      return this.game.renderer.view.addEventListener('click', function() {
+        _this.game.stage.removeChild(_this.titleScreen);
+        _this.game.renderer.view.removeEventListener('click', arguments.callee);
+        _this.game.player.visible = true;
+        return _this.startGame(0);
+      });
     };
 
     GameStateManager.prototype.startGame = function(n) {
@@ -531,7 +591,7 @@
 
   })();
 
-  document.addEventListener('DOMContentLoaded', function() {
+  Player.loader.addEventListener('loaded', function() {
     return window.game = new Game($('game'));
   });
 
