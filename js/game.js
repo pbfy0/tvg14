@@ -510,7 +510,7 @@
     GameStateManager.prototype.load = function() {
       var s,
         _this = this;
-      s = localStorage.state;
+      s = null;//localStorage.state;
       if (s != null) {
         return this.startGame(s);
       } else {
